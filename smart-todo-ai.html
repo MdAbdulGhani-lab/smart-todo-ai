@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Smart To‑Do — AI‑assisted</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+  <meta name="theme-color" content="#111827">
+  <style>
+    :root { color-scheme: light dark; }
+    html, body { height: 100%; }
+    body { font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji'; }
+    .card { border-radius: 1rem; box-shadow: 0 10px 25px rgba(0,0,0,0.08); }
+    .btn { @apply px-4 py-2 rounded-xl font-medium; }
+    .btn-primary { @apply bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50; }
+    .btn-ghost { @apply hover:bg-gray-100 dark:hover:bg-gray-800; }
+    .tag { @apply text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800; }
+    .pri-low { @apply bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200; }
+    .pri-med { @apply bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200; }
+    .pri-high { @apply bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200; }
+    .kbd { @apply border rounded-md px-1.5 py-0.5 text-xs font-mono bg-gray-50 dark:bg-gray-900; }
+    .line-through-soft { text-decoration: line-through; text-decoration-thickness: 2px; text-decoration-color: rgba(0,0,0,0.25); }
+  </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100">
+  <div class="max-w-5xl mx-auto p-4 md:p-8">
+    <!-- Header -->
+    <div class="flex items-center justify-between gap-3 mb-6">
+      <div>
+        <h1 class="text-2xl md:text-3xl font-bold tracking-tight">Smart To‑Do <span class="text-indigo-600">— AI‑assisted</span></h1>
+        <p class="text-sm text-gray-500">Fast, offline-ready, and private. Data stays in your browser.</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="exportBtn" class="btn btn-ghost" title="Export (JSON)"><span>Export</span></button>
+        <label class="btn btn-ghost cursor-pointer" title="Import (JSON)">
+          <input id="importInput" type="file" accept="application/json" class="hidden"/>
+          <span>Import</span>
+        </label>
+        <button id="clearDoneBtn" class="btn btn-ghost" title="Clear completed">Clear Done</button>
+        <button id="themeBtn" class="btn btn-ghost" title="Toggle theme">Theme</button>
+      </div>
+    </div>
+
+    <!-- Input Card -->
+    <div class="card bg-white dark:bg-gray-900 p-4 md:p-6 mb-6">
+      <div class="grid md:grid-cols-6 gap-3">
+        <div class="md:col-span-3">
+          <label class="text-sm text-gray-500">Task</label>
+          <input id="taskText" type="text" placeholder="e.g., Prepare churn model presentation" class="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+        <div>
+          <label class="text-sm text-gray-500">Due</label>
+          <input id="taskDue" type="date" class="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"/>
+        </div>
+        <div>
+          <label class="text-sm text-gray-500">Priority</label>
+          <select id="taskPriority" class="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option value="low">Low</option>
+            <option value="medium" selected>Medium</option>
+            <option value="high">High</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-sm text-gray-500">Tags</label>
+          <input id="taskTags" type="text" placeholder="comma,separated,tags" class="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"/>
+        </div>
+      </div>
+      <div class="mt-3 flex items-center gap-2">
+        <button id="addBtn" class="btn btn-primary">Add Task</button>
+        <span class="text-xs text-gray-500">Tip: Press <span class="kbd">Enter</span> to add.</span>
+      </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="flex flex-wrap items-center gap-3 mb-4">
+      <input id="searchInput" type="text" placeholder="Search tasks…" class="flex-1 min-w-[220px] px-3 py-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"/>
+      <select id="filterStatus" class="px-3 py-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
+        <option value="all">All</option>
+        <option value="open" selected>Open</option>
+        <option value="done">Completed</option>
+        <option value="overdue">Overdue</option>
+      </select>
+      <select id="sortBy" class="px-3 py-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
+        <option value="created">Sort: Created</option>
+        <option value="due">Sort: Due</option>
+        <option value="priority">Sort: Priority</option>
+      </select>
+    </div>
+
+    <!-- Content -->
+    <div class="grid md:grid-cols-3 gap-6">
+      <!-- List -->
+      <div class="md:col-span-2 card bg-white dark:bg-gray-900 p-4">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-lg font-semibold">Tasks</h2>
+          <span id="countBadge" class="text-sm text-gray-500"></span>
+        </div>
+        <ul id="taskList" class="space-y-3"></ul>
+      </div>
+
+      <!-- AI Assist -->
+      <div class="card bg-white dark:bg-gray-900 p-4">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-lg font-semibold">AI Assist</h2>
+        </div>
+        <p class="text-sm text-gray-500 mb-3">Optional: paste your OpenAI API key to enable smart suggestions, breakdowns, and prioritization. Stored locally only.</p>
+        <input id="apiKey" type="password" placeholder="sk-..." class="w-full mb-2 px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"/>
+        <div class="flex items-center gap-2 mb-3">
+          <button id="saveKey" class="btn btn-ghost">Save Key</button>
+          <button id="clearKey" class="btn btn-ghost">Clear</button>
+        </div>
+        <textarea id="aiPrompt" rows="4" placeholder="e.g., Turn these into tasks: finalize resume, apply to 3 roles, revise cover letter" class="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 mb-2"></textarea>
+        <div class="flex items-center gap-2">
+          <button id="aiSuggest" class="btn btn-primary">Generate Tasks</button>
+          <button id="aiPrioritize" class="btn btn-ghost">Prioritize Current</button>
+        </div>
+        <div id="aiOut" class="mt-3 text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap"></div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="text-xs text-gray-500 mt-6 text-center">
+      Built with ❤️ — all data stored in your browser. Open‑source license: MIT.
+    </div>
+  </div>
+
+  <script>
+    // --- Utilities & State ---
+    const $ = (id) => document.getElementById(id);
+    const uid = () => crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
+    const storageKey = "smarttodo.tasks.v1";
+    const themeKey = "smarttodo.theme";
+    const apiKeyKey = "smarttodo.openai.key";
+
+    let tasks = JSON.parse(localStorage.getItem(storageKey) || "[]");
+
+    const save = () => localStorage.setItem(storageKey, JSON.stringify(tasks));
+    const fmtDate = (d) => d ? new Date(d).toLocaleDateString() : "";
+    const nowISO = () => new Date().toISOString().slice(0,10);
+
+    // --- Theme ---
+    const applyTheme = (t) => {
+      if (t === "dark") document.documentElement.classList.add("dark");
+      else document.documentElement.classList.remove("dark");
+      localStorage.setItem(themeKey, t);
+    };
+    (function initTheme(){
+      const saved = localStorage.getItem(themeKey) || (matchMedia('(prefers-color-scheme: dark)').matches ? "dark":"light");
+      applyTheme(saved);
+    })();
+    $("themeBtn").addEventListener("click", () => {
+      const cur = localStorage.getItem(themeKey) || "light";
+      applyTheme(cur === "light" ? "dark" : "light");
+    });
+
+    // --- Rendering ---
+    function render() {
+      const list = $("taskList");
+      list.innerHTML = "";
+      const q = $("searchInput").value.toLowerCase().trim();
+      const status = $("filterStatus").value;
+      const sort = $("sortBy").value;
+
+      let filtered = tasks.filter(t => {
+        const matches = t.text.toLowerCase().includes(q) || (t.tags||[]).join(",").toLowerCase().includes(q);
+        const overdue = t.due && !t.done && new Date(t.due) < new Date(nowISO());
+        if (status === "open") return matches && !t.done;
+        if (status === "done") return matches && t.done;
+        if (status === "overdue") return matches && overdue;
+        return matches;
+      });
+
+      filtered.sort((a,b) => {
+        if (sort === "created") return a.createdAt.localeCompare(b.createdAt);
+        if (sort === "due") return (a.due||"9999").localeCompare(b.due||"9999");
+        if (sort === "priority") {
+          const order = {high:0, medium:1, low:2};
+          return (order[a.priority] ?? 1) - (order[b.priority] ?? 1);
+        }
+        return 0;
+      });
+
+      $("countBadge").textContent = `${filtered.length} shown / ${tasks.length} total`;
+
+      for (const t of filtered) {
+        const li = document.createElement("li");
+        li.className = "p-3 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700";
+        li.dataset.id = t.id;
+        const overdue = t.due && !t.done && new Date(t.due) < new Date(nowISO());
+
+        li.innerHTML = `
+          <div class="flex items-start gap-3">
+            <input type="checkbox" ${t.done ? "checked": ""} class="mt-1">
+            <div class="flex-1 min-w-0">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="font-medium ${t.done ? "line-through-soft text-gray-400": ""} break-words">${escapeHTML(t.text)}</span>
+                ${t.priority ? `<span class="tag ${priClass(t.priority)}">${t.priority}</span>` : ""}
+                ${overdue ? `<span class="tag pri-high">overdue</span>` : ""}
+                ${(t.tags||[]).map(tag => `<span class="tag">${escapeHTML(tag)}</span>`).join("")}
+              </div>
+              <div class="text-xs text-gray-500 mt-1">
+                ${t.due ? `Due: ${fmtDate(t.due)}` : ""} ${t.due && t.estimate ? "•" : ""} ${t.estimate ? `ETA: ${t.estimate}` : ""}
+              </div>
+            </div>
+            <div class="flex items-center gap-1">
+              <button class="btn btn-ghost text-xs edit">Edit</button>
+              <button class="btn btn-ghost text-xs del">Delete</button>
+            </div>
+          </div>
+        `;
+
+        const [chk, , , btns] = li.querySelectorAll("input,div,div,div");
+        chk.addEventListener("change", () => {
+          t.done = chk.checked;
+          t.completedAt = t.done ? new Date().toISOString() : null;
+          save(); render();
+        });
+        btns.querySelector(".edit").addEventListener("click", () => editTask(t.id));
+        btns.querySelector(".del").addEventListener("click", () => deleteTask(t.id));
+        list.appendChild(li);
+      }
+
+      // Enable drag-and-drop (on filtered subset visual only)
+      new Sortable(list, {
+        animation: 150,
+        onEnd: (evt) => {
+          // Reorder global tasks array according to visible order
+          const idOrder = Array.from(list.children).map(li => li.dataset.id);
+          tasks.sort((a,b) => idOrder.indexOf(a.id) - idOrder.indexOf(b.id));
+          save();
+        }
+      });
+    }
+
+    const priClass = (p) => p === "high" ? "pri-high" : p === "medium" ? "pri-med" : "pri-low";
+
+    function escapeHTML(str) {
+      return str.replace(/[&<>"']/g, (m) => ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'
+      }[m]));
+    }
+
+    // --- CRUD ---
+    function addTask() {
+      const text = $("taskText").value.trim();
+      if (!text) return;
+      tasks.push({
+        id: uid(),
+        text,
+        due: $("taskDue").value || null,
+        priority: $("taskPriority").value,
+        tags: ($("taskTags").value || "").split(",").map(s=>s.trim()).filter(Boolean),
+        estimate: null,
+        done: false,
+        createdAt: new Date().toISOString(),
+        completedAt: null
+      });
+      $("taskText").value = "";
+      $("taskDue").value = "";
+      $("taskTags").value = "";
+      save(); render();
+    }
+
+    function editTask(id) {
+      const t = tasks.find(x => x.id === id);
+      if (!t) return;
+      const text = prompt("Edit task", t.text);
+      if (text === null) return;
+      const due = prompt("Edit due date (YYYY-MM-DD) or blank", t.due || "");
+      const priority = prompt("Priority: low|medium|high", t.priority || "medium");
+      const tags = prompt("Tags (comma-separated)", (t.tags||[]).join(","));
+      t.text = text.trim() || t.text;
+      t.due = (due||"").trim() || null;
+      t.priority = (priority||"medium").toLowerCase();
+      t.tags = (tags||"").split(",").map(s=>s.trim()).filter(Boolean);
+      save(); render();
+    }
+
+    function deleteTask(id) {
+      tasks = tasks.filter(t => t.id !== id);
+      save(); render();
+    }
+
+    // --- Export / Import / Clear ---
+    $("exportBtn").addEventListener("click", () => {
+      const blob = new Blob([JSON.stringify(tasks, null, 2)], {type:"application/json"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "smarttodo-tasks.json";
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+    $("importInput").addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const data = JSON.parse(reader.result);
+          if (Array.isArray(data)) {
+            tasks = data; save(); render();
+          } else alert("Invalid file format.");
+        } catch(err) { alert("Could not parse JSON."); }
+      };
+      reader.readAsText(file);
+      e.target.value = "";
+    });
+    $("clearDoneBtn").addEventListener("click", () => {
+      if (confirm("Delete all completed tasks?")) {
+        tasks = tasks.filter(t=>!t.done); save(); render();
+      }
+    });
+
+    // --- Inputs ---
+    $("addBtn").addEventListener("click", addTask);
+    $("taskText").addEventListener("keydown", (e)=>{ if(e.key === "Enter") addTask(); });
+    $("searchInput").addEventListener("input", render);
+    $("filterStatus").addEventListener("change", render);
+    $("sortBy").addEventListener("change", render);
+
+    // --- AI Assist (optional with user key) ---
+    const keyInput = $("apiKey");
+    keyInput.value = localStorage.getItem(apiKeyKey) || "";
+    $("saveKey").addEventListener("click", () => {
+      localStorage.setItem(apiKeyKey, keyInput.value.trim());
+      alert("API key saved locally.");
+    });
+    $("clearKey").addEventListener("click", () => {
+      localStorage.removeItem(apiKeyKey);
+      keyInput.value = "";
+      alert("API key cleared.");
+    });
+
+    async function callOpenAI(system, user) {
+      const key = localStorage.getItem(apiKeyKey) || keyInput.value.trim();
+      if (!key) { alert("Please paste your OpenAI API key first."); return null; }
+      try {
+        const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type":"application/json",
+            "Authorization":"Bearer " + key
+          },
+          body: JSON.stringify({
+            model: "gpt-4o-mini",
+            messages: [
+              {role:"system", content: system},
+              {role:"user", content: user}
+            ],
+            temperature: 0.2
+          })
+        });
+        if (!resp.ok) {
+          const t = await resp.text();
+          throw new Error(t || ("HTTP " + resp.status));
+        }
+        const data = await resp.json();
+        return data.choices?.[0]?.message?.content || "";
+      } catch (e) {
+        console.error(e);
+        alert("OpenAI call failed. Check key and network. " + e.message);
+        return null;
+      }
+    }
+
+    $("aiSuggest").addEventListener("click", async () => {
+      const prompt = $("aiPrompt").value.trim();
+      if (!prompt) return;
+      const system = "You are a task planner. Given free‑form text, return a JSON array of tasks. Each item: {text, due (YYYY-MM-DD or null), priority in [low,medium,high], tags: [strings], estimate: short string}. Return ONLY JSON.";
+      const out = await callOpenAI(system, prompt);
+      if (!out) return;
+      $("aiOut").textContent = out;
+      try {
+        const arr = JSON.parse(out);
+        if (Array.isArray(arr)) {
+          for (const it of arr) {
+            tasks.push({
+              id: uid(),
+              text: String(it.text || "").trim(),
+              due: it.due || null,
+              priority: (it.priority || "medium").toLowerCase(),
+              tags: Array.isArray(it.tags) ? it.tags.map(s=>String(s)) : [],
+              estimate: it.estimate || null,
+              done: false,
+              createdAt: new Date().toISOString(),
+              completedAt: null
+            });
+          }
+          save(); render();
+        }
+      } catch (_) {/* if not JSON, just show raw */}
+    });
+
+    $("aiPrioritize").addEventListener("click", async () => {
+      if (!tasks.length) return alert("No tasks to prioritize.");
+      const system = "You are a prioritization assistant. Given tasks with fields text, due, priority, done, output the same list sorted by urgency and importance. Return ONLY JSON array of ids in desired order.";
+      const user = JSON.stringify(tasks.map(({id,text,due,priority,done})=>({id,text,due,priority,done})));
+      const out = await callOpenAI(system, user);
+      if (!out) return;
+      $("aiOut").textContent = out;
+      try {
+        const order = JSON.parse(out);
+        if (Array.isArray(order)) {
+          const map = new Map(tasks.map((t)=>[t.id,t]));
+          const reordered = [];
+          for (const id of order) if (map.has(id)) reordered.push(map.get(id));
+          // append any missing
+          for (const t of tasks) if (!reordered.includes(t)) reordered.push(t);
+          tasks = reordered; save(); render();
+        }
+      } catch (_) {}
+    });
+
+    // --- Init with sample tasks if none ---
+    if (!tasks.length) {
+      tasks = [
+        {id:uid(), text:"Set up project board", due: nowISO(), priority:"high", tags:["setup"], estimate:"15m", done:false, createdAt:new Date().toISOString(), completedAt:null},
+        {id:uid(), text:"Draft resume for Data Analyst roles", due:null, priority:"medium", tags:["career"], estimate:"1h", done:false, createdAt:new Date().toISOString(), completedAt:null},
+        {id:uid(), text:"Practice ML interview questions", due:null, priority:"low", tags:["learning","ML"], estimate:"30m", done:false, createdAt:new Date().toISOString(), completedAt:null}
+      ];
+      save();
+    }
+
+    render();
+  </script>
+</body>
+</html>
